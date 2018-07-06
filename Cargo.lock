@@ -1,0 +1,14 @@
+[[package]]
+name = "lazyf"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "tither"
+version = "0.1.0"
+dependencies = [
+ "lazyf 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[metadata]
+"checksum lazyf 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "3d2ae09b76e23d8531e00096634474d3d12041aafa40f6c63735d72562e9d929"
