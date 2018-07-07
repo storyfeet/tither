@@ -2,13 +2,17 @@ extern crate lazyf;
 extern crate chrono;
 
 use lazyf::{Cfg,SGetter};
-use chrono::{Utc};
+use chrono::{Utc,Date,TimeZone};
+
+
+mod money;
+use money::Money;
 
 #[derive(PartialEq,Debug)]
 struct Transaction{
-    date:Utc,
+    date:Date<Utc>,
     currency:String,
-    amount:i32,
+    amount:Money,
     source:String, 
 }
 
@@ -28,7 +32,6 @@ impl Action {
     pub fn from_str(ss:&str)->Action{
         use Action::*;
         let ss = ss.trim();
-        let mut dt = Utc::today(); 
 
         match ss.chars().next(){
             Some('=')=>{
@@ -36,17 +39,36 @@ impl Action {
             Some('#')|None=>{return NoAction},
             _=>{},
         }
+        let mut res_dt = Utc::today(); 
+        let mut res_am = 0;
+        let mut res_items = "".to_string();
         let mut is_tithe = false;
+
         for s in ss.split(",").map(|x|x.trim()){
             if s.len() == 0 {
                 continue;
             }
+            if s.chars().next() == Some('#') {
+                continue;
+            }
+            match Utc.datetime_from_str(s,"&d/&m/&Y"){
+                Ok(dparse)=>{
+                    res_dt = dparse.date();
+                    continue;
+                },
+                _=>{},
+            }
+
+            
+            
 
 
         }
-        Trans({
-            date:date,
-            currency:"GBP".to_string,
+        Trans(Transaction{
+            date:res_dt,
+            currency:"GBP".to_string(),
+            amount:Money::from(0),
+            source:"".to_string(),
             
         })
     }
@@ -64,6 +86,7 @@ fn main() {
 #[cfg(test)]
 mod tests{
     use super::*;
+    use super::Action::*;
     
     #[test]
     fn test_from_str(){
