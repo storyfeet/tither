@@ -10,6 +10,7 @@ use std::io::{BufReader,BufRead};
 
 
 mod money;
+mod date;
 use money::Money;
 
 #[derive(PartialEq,Debug)]
@@ -39,7 +40,7 @@ impl Action {
             Some('=')=>{
                 //TODO
             },
-            Some('#')|None=>{return NoAction},
+            Some('#')|Some('!')|None=>{return NoAction},
             _=>{},
         }
         let mut res_date = Utc::today(); 
@@ -52,12 +53,12 @@ impl Action {
                 _=> {},
             }
 
-            match Utc.datetime_from_str(s,"&d/&m/&y"){
+            match date::date_from_str(s){
                 Ok(dparse)=>{
-                    res_date = dparse.date();
+                    res_date = dparse;
                     continue;
                 },
-                _=>{},
+                Err(e) =>{print!("{}\n",e);},
             }
 
             match Money::from_str(s){
