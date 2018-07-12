@@ -1,0 +1,9 @@
+=tithe,20
+3/5/15,40,spat
+4/5/15,60,spat
+
+=tithe,10
+5/5/15,100,spot
+
+6/5/15,30,tithe
+#exp - total = 30

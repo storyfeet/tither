@@ -1,5 +1,7 @@
+use std::ops::{Div,Add,Sub,Mul,AddAssign};
+
 use std::str::FromStr;
-use std::num::ParseIntError;
+//use std::num::ParseIntError;
 use std::fmt;
 
 
@@ -27,7 +29,7 @@ impl FromStr for Money{
         let mut ch = v[1].chars();
         let mut pns = 0;
 
-        for i in 0..2{
+        for _ in 0..2{
             pns *= 10;
             match ch.next(){
                 Some(n)=>{
@@ -86,5 +88,37 @@ mod tests{
 }
 
 
+impl Add for Money{
+    type Output=Self;
+    fn add(self,other :Money)->Self{
+        Money(self.0 + other.0)
+    }
+}
+impl Sub for Money{
+    type Output=Self;
+    fn sub(self,other :Money)->Self{
+        Money(self.0 - other.0)
+    }
+}
 
+impl AddAssign for Money{
+    fn add_assign(&mut self,other:Self){
+        self.0 += other.0;
+    }
+}
+
+
+impl Div<i32> for Money{
+    type Output=Self;
+    fn div(self,rhs:i32)->Self{
+        Money(self.0/rhs)
+    }
+}
+
+impl Mul<i32> for Money{
+    type Output=Self;
+    fn mul(self,rhs:i32)->Self{
+        Money(self.0*rhs)
+    }
+}
 

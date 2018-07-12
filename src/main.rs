@@ -2,82 +2,80 @@ extern crate lazyf;
 extern crate chrono;
 
 use lazyf::{Cfg,SGetter};
-use chrono::{Utc,Date,TimeZone};
 
-use std::str::FromStr;
 use std::fs::File;
 use std::io::{BufReader,BufRead};
 
 
 mod money;
-mod date;
 use money::Money;
 
-#[derive(PartialEq,Debug)]
-struct Transaction{
-    date:Date<Utc>,
-    amount:Money,
-    items:Vec<String>, 
+mod action;
+use action::{Action};
+
+use std::collections::HashMap;
+
+
+struct Tracker{
+    t_paid:Money,
+    t_req:Money,
+    income:Money,
 }
 
+fn get_tracker<'a>(mp:&'a mut HashMap<String,Tracker>,curr:&str)->&'a mut  Tracker{
+    
+    let has_item = match mp.get(curr){
+        Some(_)=>true,
+        None=>false,
+    };
+    if !has_item {
+        mp.insert(curr.to_string(),Tracker{t_paid:Money::from(0),t_req:Money::from(0),income:Money::from(0)});
+    }
 
-#[derive(PartialEq,Debug)]
-enum Action{
-    Trans(Transaction),
-    SetCurr(String),
-    SetTithe(i32),
-    NoAction,
+    mp.get_mut(curr).unwrap()
+    
 }
 
+fn count_tithe(aa:&[Action])
+{
+    use action::Action::*;
 
-impl Action {
+    let mut trackers = HashMap::new();
+    
+    let mut curr = "GBP".to_string();
+    
 
-    pub fn from_str(ss:&str)->Action{
-        use Action::*;
-        let ss = ss.trim();
-
-        match ss.chars().next(){
-            Some('=')=>{
-                //TODO
+    let mut tithe_pc = 10;
+    for a in aa {
+        match a{
+            &Trans(ref t)=>{
+                let c_tracker = get_tracker(&mut trackers,&curr);
+                if t.is_tithe(){
+                    c_tracker.t_paid += t.amount;
+                    
+                } else{
+                    c_tracker.income += t.amount;
+                    c_tracker.t_req += (t.amount * tithe_pc)/100;
+                }
             },
-            Some('#')|Some('!')|None=>{return NoAction},
+            &SetTithe(n)=>{
+                tithe_pc = n;
+            }
+            &SetCurr(ref c)=>{
+                curr = c.to_string();
+            }
             _=>{},
         }
-        let mut res_date = Utc::today(); 
-        let mut res_amount = Money::from(0);
-        let mut res_items= Vec::new();
-
-        for s in ss.split(",").map(|x|x.trim()){
-            match s.chars().next(){
-                Some('#')|None => continue,
-                _=> {},
-            }
-
-            match date::date_from_str(s){
-                Ok(dparse)=>{
-                    res_date = dparse;
-                    continue;
-                },
-                Err(e) =>{print!("{}\n",e);},
-            }
-
-            match Money::from_str(s){
-                Ok(mparse)=>{
-                    res_amount = mparse;
-                    continue;
-                }
-                _=>{},
-            }
-            res_items.push(s.to_string());
-        }
-        Trans(Transaction{
-            date:res_date,
-            amount:res_amount,
-            items:res_items,
-            
-        })
     }
+
+    for (s,v) in trackers {
+        print!("{}\n",s);
+        print!("income = {}, req = {}, paid = {}\n",v.income,v.t_req,v.t_paid);
+        print!("owed = {}\n",v.t_req - v.t_paid);
+    }
+    
 }
+
 
 
 fn main() {
@@ -88,13 +86,14 @@ fn main() {
     let f = File::open(fname).expect("Could not read file");
     let f = BufReader::new(f);
 
+    let mut v= Vec::new();
     for line in f.lines(){
-        
         let a = Action::from_str(&(line.unwrap()));
-        print!("{:?}\n",a);
+        v.push(a);
+        //print!("{:?}\n",a);
     }
 
-
+    count_tithe(&v);
 
 }
 
@@ -102,7 +101,7 @@ fn main() {
 #[cfg(test)]
 mod tests{
     use super::*;
-    use super::Action::*;
+    use super::action::Action::*;
     
     #[test]
     fn test_from_str(){
