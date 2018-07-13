@@ -1,6 +1,7 @@
 extern crate lazyf;
 extern crate chrono;
 
+
 use lazyf::{Cfg,SGetter};
 
 use std::fs::File;
@@ -12,6 +13,7 @@ use money::Money;
 
 mod action;
 use action::{Action};
+use Action::*;
 
 use std::collections::HashMap;
 
@@ -20,6 +22,19 @@ struct Tracker{
     t_paid:Money,
     t_req:Money,
     income:Money,
+    outgoing:Money, // Should be negative
+}
+
+impl Tracker{
+    fn new()->Tracker{
+        Tracker{
+            t_paid:Money::from(0),
+            t_req:Money::from(0),
+            income:Money::from(0),
+            outgoing:Money::from(0),
+        }
+        
+    }
 }
 
 fn get_tracker<'a>(mp:&'a mut HashMap<String,Tracker>,curr:&str)->&'a mut  Tracker{
@@ -29,16 +44,31 @@ fn get_tracker<'a>(mp:&'a mut HashMap<String,Tracker>,curr:&str)->&'a mut  Track
         None=>false,
     };
     if !has_item {
-        mp.insert(curr.to_string(),Tracker{t_paid:Money::from(0),t_req:Money::from(0),income:Money::from(0)});
+        mp.insert(curr.to_string(),Tracker::new());
     }
 
     mp.get_mut(curr).unwrap()
     
 }
 
+fn filter_tags(aa:&[Action],tags:&[String])->Vec<Action>
+{
+    let mut res = Vec::new();
+    
+    for a in aa {
+        match a {
+            &Trans(ref t)=>if t.has_a_tag(tags){
+                res.push(Trans((*t).clone()));
+            },
+            _=>res.push((*a).clone()),
+        }
+    }
+    return res;
+}
+
+
 fn count_tithe(aa:&[Action])
 {
-    use action::Action::*;
 
     let mut trackers = HashMap::new();
     
@@ -54,7 +84,11 @@ fn count_tithe(aa:&[Action])
                     c_tracker.t_paid += t.amount;
                     
                 } else{
-                    c_tracker.income += t.amount;
+                    if t.amount > Money::from(0) {
+                        c_tracker.income += t.amount
+                    }else {
+                        c_tracker.outgoing += t.amount 
+                    }
                     c_tracker.t_req += (t.amount * tithe_pc)/100;
                 }
             },
@@ -70,8 +104,8 @@ fn count_tithe(aa:&[Action])
 
     for (s,v) in trackers {
         print!("{}\n",s);
-        print!("income = {}, req = {}, paid = {}\n",v.income,v.t_req,v.t_paid);
-        print!("owed = {}\n",v.t_req - v.t_paid);
+        print!("income = {},outgoing = {}, net= {}\n",v.income,v.outgoing,v.income+v.outgoing);
+        print!("tithe: req = {}, paid = {}, owed = {}\n",v.t_req,v.t_paid,v.t_req - v.t_paid);
     }
     
 }
@@ -82,6 +116,7 @@ fn main() {
     let cfg = Cfg::load_first("conf",&["{HOME}/.config/tither/init"]);
 
     let fname = cfg.get_s(("-f","config.filename")).expect("No Filename given");
+    let tags = cfg.get_s(("-t","config.tags"));
 
     let f = File::open(fname).expect("Could not read file");
     let f = BufReader::new(f);
@@ -93,10 +128,15 @@ fn main() {
         //print!("{:?}\n",a);
     }
 
+    if let Some(t) = tags {
+        let tgs:Vec<String> = t.split(",").map(|x|x.to_string()).collect();
+        print!("Tags = {:?}\n",tgs);
+        v = filter_tags(&v,&tgs);
+    }
+
     count_tithe(&v);
 
 }
-
 
 #[cfg(test)]
 mod tests{

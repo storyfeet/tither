@@ -5,7 +5,7 @@ use std::str::FromStr;
 use std::fmt;
 
 
-#[derive(PartialEq,Copy,Clone,Debug)]
+#[derive(PartialEq,PartialOrd,Copy,Clone,Debug)]
 pub struct Money(i32);
 
 impl From<i32>for Money{    

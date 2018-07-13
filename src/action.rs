@@ -2,7 +2,7 @@ use money::Money;
 use chrono::{NaiveDate};
 use std::str::FromStr;
 
-#[derive(PartialEq,Debug)]
+#[derive(PartialEq,Debug,Clone)]
 pub struct Transaction{
     date:NaiveDate,
     pub amount:Money,
@@ -13,10 +13,23 @@ impl Transaction {
     pub fn is_tithe(&self)->bool{
         self.items.iter().find(|x| x.starts_with("tithe")) != None 
     }
+    pub fn has_tag(&self,t:&str)->bool{
+        self.items.iter().find(|x| *x == t) != None
+    }
+
+    pub fn has_a_tag(&self,tags:&[String])->bool
+    {
+        for t in tags{
+            if self.has_tag(&t){
+                return true;
+            }
+        }
+        false
+    }
 }
 
 
-#[derive(PartialEq,Debug)]
+#[derive(PartialEq,Debug,Clone)]
 pub enum Action{
     Trans(Transaction),
     SetCurr(String),
