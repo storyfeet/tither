@@ -9,6 +9,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "lazy_conf"
+version = "0.1.1"
+
+[[package]]
 name = "lazyf"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -51,6 +55,7 @@ name = "tither"
 version = "0.1.0"
 dependencies = [
  "chrono 0.4.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lazy_conf 0.1.1",
  "lazyf 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 

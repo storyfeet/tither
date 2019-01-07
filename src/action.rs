@@ -1,4 +1,4 @@
-use money::Money;
+use crate::money::Money;
 use chrono::{NaiveDate};
 use std::str::FromStr;
 
@@ -81,7 +81,7 @@ impl Action {
 
             match Money::from_str(s){
                 Ok(mparse)=>{
-                    res_amount = mparse;
+                    res_amount += mparse;
                     continue;
                 }
                 _=>{},

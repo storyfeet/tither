@@ -1,19 +1,16 @@
-extern crate lazyf;
-extern crate chrono;
 
 
-use lazyf::{Cfg,SGetter};
-
+use lazy_conf::config;
 use std::fs::File;
 use std::io::{BufReader,BufRead};
 
 
 mod money;
-use money::Money;
+use crate::money::Money;
 
 mod action;
-use action::{Action};
-use Action::*;
+use crate::action::{Action};
+use self::Action::*;
 
 use std::collections::HashMap;
 
@@ -112,11 +109,20 @@ fn count_tithe(aa:&[Action])
 
 
 
-fn main() {
-    let cfg = Cfg::load_first("conf",&["{HOME}/.config/tither/init"]);
 
-    let fname = cfg.get_s(("-f","config.filename")).expect("No Filename given");
-    let tags = cfg.get_s(("-t","config.tags"));
+fn main()->Result<(),String> {
+    let mut cfg = config("-c",&["{HOME}/.config.tither/init"]).expect("Done something wierd with the options here");
+    let fname = cfg.grab().fg("-f").cf("config.filename").help("filename for Accounts file").s();
+
+
+    let tags = cfg.grab().fg("-t").cf("config.tags").help("Coma separated tags to search for").s();
+
+    if cfg.help("Tither") {return Ok(())}
+
+    let fname = fname.ok_or("use -f to provide an accounts file")?;
+
+
+
 
     let f = File::open(fname).expect("Could not read file");
     let f = BufReader::new(f);
@@ -135,6 +141,7 @@ fn main() {
     }
 
     count_tithe(&v);
+    Ok(())
 
 }
 

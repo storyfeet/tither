@@ -2,8 +2,10 @@
 name = "tither"
 version = "0.1.0"
 authors = ["storyfeet <thebeaky@psmail.net>"]
+edition = "2018"
 
 [dependencies]
 
 lazyf = "0.1.2"
+lazy_conf = { path="../../mlibs/lazy_conf"}
 chrono = "0.4"
