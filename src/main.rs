@@ -1,9 +1,9 @@
 
 
-use lazy_conf::config;
-use std::fs::File;
+//use lazy_conf::config;
 use std::io::{BufReader,BufRead};
 
+mod error;
 
 mod money;
 use crate::money::Money;
@@ -13,6 +13,8 @@ use crate::action::{Action};
 use self::Action::*;
 
 use std::collections::HashMap;
+
+use clap_conf::prelude::*;
 
 
 struct Tracker{
@@ -110,34 +112,35 @@ fn count_tithe(aa:&[Action])
 
 
 
-fn main()->Result<(),String> {
-    let mut cfg = config("-c",&["{HOME}/.config.tither/init"]).expect("Done something wierd with the options here");
-    let fname = cfg.grab().fg("-f").cf("config.filename").help("filename for Accounts file").s();
+fn main()->Result<(),failure::Error> {
+    let clap = clap_app!(Tither => 
+                        (about:"A program to calculate tithe due")
+                        (author:"Matt Stoodley")
+                        (version:crate_version!())
+                        (@arg filename:-f --filename +takes_value "filename to work on")
+                        (@arg tags:-t --tage +takes_value ... "Tags to search for")
+        ).get_matches();
+
+    let cfg = with_toml_env(&clap,&["{HOME}/.config/tither/init"]);
+
+    let fname = cfg.grab().arg("filename").conf("config.filename").req()?;
+
+    let tags = clap.values_of("tags");
 
 
-    let tags = cfg.grab().fg("-t").cf("config.tags").help("Coma separated tags to search for").s();
-
-    if cfg.help("Tither") {return Ok(())}
-
-    let fname = fname.ok_or("use -f to provide an accounts file")?;
-
-
-
-
-    let f = File::open(fname).expect("Could not read file");
-    let f = BufReader::new(f);
+    let fd = std::fs::read_to_string(fname)?;
 
     let mut v= Vec::new();
-    for line in f.lines(){
-        let a = Action::from_str(&(line.unwrap()));
+    for (num,line) in fd.lines().into_iter().enumerate(){
+        let a = Action::from_str(line);
         v.push(a);
         //print!("{:?}\n",a);
     }
 
     if let Some(t) = tags {
-        let tgs:Vec<String> = t.split(",").map(|x|x.to_string()).collect();
-        print!("Tags = {:?}\n",tgs);
-        v = filter_tags(&v,&tgs);
+        let tt:Vec<String> = t.map(|v|v.to_string()).collect();
+        print!("Tags = {:?}\n",tt);
+        v = filter_tags(&v,&tt);
     }
 
     count_tithe(&v);
