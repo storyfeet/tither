@@ -1,42 +1,22 @@
-use crate::error::ParseError;
-use crate::money::Money;
-use std::str::FromStr;
+use crate::money::{Money, PMoney};
+use gobble::*;
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct DMoY {
-    d: i32,
-    m: i32,
-    y: Option<i32>,
+    d: usize,
+    m: usize,
+    y: Option<isize>,
 }
 
-impl FromStr for DMoY {
-    type Err = ParseError;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut ss = s
-            .split("/")
-            .map(|s| s.trim().parse::<i32>().map_err(|_| ParseError::DateError));
-        let d = ss.next().unwrap()?;
-        let m = ss.next().ok_or(ParseError::DateError)??;
-        let y = match ss.next() {
-            Some(Ok(n)) => Some(n),
-            Some(Err(_)) => return Err(ParseError::DateError),
-            None => None,
-        };
-        Ok(DMoY { d, m, y })
-    }
+parser! {
+    (PDate->DMoY),
+    (CommonUInt,last('/',CommonUInt),maybe(last('/',CommonInt)))
+        .map(|(d,m,y)|DMoY{d,m,y})
 }
 
-#[derive(PartialEq, Debug, Clone)]
-pub struct ParsedTransaction {
-    line: usize,
-    date: Option<DMoY>,
-    pub amount: Money,
-    items: Vec<String>,
-}
-
-impl ParsedTransaction {
+impl Transaction {
     pub fn is_tithe(&self) -> bool {
-        self.items.iter().find(|x| x.starts_with("tithe")) != None
+        self.tithe
     }
     pub fn has_tag<T: AsRef<str>>(&self, t: T) -> bool {
         self.items.iter().find(|x| *x == t.as_ref()) != None
@@ -53,83 +33,94 @@ impl ParsedTransaction {
 }
 
 #[derive(PartialEq, Debug, Clone)]
-pub enum Action {
-    Trans(ParsedTransaction),
-    SetCurr(String),
-    SetTithe(i32), //as percent
-    SetYear(i32),
-    NoAction,
+pub struct LineAction {
+    pub a: Action,
+    pub l: usize,
 }
 
-impl Action {
-    pub fn has_a_tag_or<S: AsRef<str>, T: Iterator<Item = S>>(&self, it: T) -> bool {
-        match self {
-            Action::Trans(pt) => pt.has_a_tag(it),
-            _ => true,
+#[derive(PartialEq, Debug, Clone)]
+pub enum Action {
+    Trans(Transaction),
+    SetCurr(String),
+    SetTithe(isize), //as percent
+    SetYear(usize),
+    SetDate(DMoY),
+}
+
+pub fn setter(s: &'static str) -> impl Parser<Out = &'static str> {
+    or!(middle("=", s, ":,".one()), first(s, "="))
+}
+
+parser! {
+    (PFile->Vec<LineAction>),
+    first(rep((NextAction,PAction)),(NextAction,eoi))
+        .map(|v|v.into_iter().map(|(l,a)|LineAction{l,a}).collect())
+
+}
+
+parser! {
+    (PAction->Action),
+    or!(
+        (setter("tithe"),CommonInt,maybe("%")).map(|(_,n,_)|Action::SetTithe(n)),
+        (setter("year"),CommonUInt).map(|(_,n)|Action::SetYear(n)),
+        (setter("curr"),Alpha.star()).map(|(_,s)|Action::SetCurr(s)),
+        PDate.map(|d| Action::SetDate(d)),
+        PTransaction.map(|t|Action::Trans(t))
+    )
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub struct Transaction {
+    pub amount: Money,
+    pub tithe: bool,
+    pub items: Vec<String>,
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub enum TransactionItem {
+    Amount(Money),
+    Tithe,
+    Item(String),
+}
+
+parser! {
+    (NextAction->usize)
+    skip_2_star("\t ,\n\r".skip_plus(),last("#!".one(),Any.except(",\n").skip_star())).ig_then(line_col).map(|(l,_)|l)
+}
+
+parser! {
+    (NextItem->usize)
+    skip_2_star("\t ,".skip_plus(),last('#',Any.except(",\n").skip_star())).ig_then(line_col).map(|(l,_)|l)
+}
+
+parser! {
+    (IString->String),
+    string((Alpha.plus(),sep((Alpha,NumDigit,"-_").plus(),WS.plus())))
+}
+
+parser! {
+    (PTranItem -> TransactionItem),
+    or!(
+        PMoney.map(|m|TransactionItem::Amount(m)),
+        ("tithe",Any.except(",\n").star()).map(|_|TransactionItem::Tithe),
+        or(CommonStr,IString).map(|s|TransactionItem::Item(s))
+    )
+
+}
+
+parser! {
+    (PTransaction -> Transaction),
+    repeat_until_ig(first(PTranItem,NextItem),'\n').map(|v| {
+        let mut amount = Money::from(0);
+        let mut items = Vec::new();
+        let mut is_tithe = false;
+        for i in v{
+            match i{
+                TransactionItem::Amount(a)=> amount += a,
+                TransactionItem::Item(s)=> items.push(s),
+                TransactionItem::Tithe=> is_tithe = true,
+            }
         }
-    }
-
-    pub fn from_line(linenum: usize, ss: &str) -> Result<Action, ParseError> {
-        use self::Action::*;
-        let ss = ss.trim();
-
-        match ss.chars().next() {
-            Some('=') => {
-                if ss.starts_with("=curr,") {
-                    return Ok(SetCurr(ss.trim_start_matches("=curr,").trim().to_string()));
-                }
-                if ss.starts_with("=tithe,") {
-                    return ss
-                        .trim_start_matches("=tithe,")
-                        .trim()
-                        .parse::<i32>()
-                        .map(|v| SetTithe(v))
-                        .map_err(|_| ParseError::TitheNotSet);
-                }
-                if ss.starts_with("=year,") {
-                    return ss
-                        .trim_start_matches("=year,")
-                        .trim()
-                        .parse::<i32>()
-                        .map(|v| SetYear(v))
-                        .map_err(|_| ParseError::YearNotSet);
-                }
-            }
-            Some('#') | Some('!') | None => return Ok(NoAction),
-            _ => {}
-        }
-        let mut res_date = None;
-        let mut res_amount = Money::from(0);
-        let mut res_items = Vec::new();
-
-        for s in ss.split(",").map(|x| x.trim()) {
-            match s.chars().next() {
-                Some('#') | None => continue,
-                _ => {}
-            }
-
-            match DMoY::from_str(s) {
-                Ok(dparse) => {
-                    res_date = Some(dparse);
-                    continue;
-                }
-                Err(_) => {}
-            }
-
-            match Money::from_str(s) {
-                Ok(mparse) => {
-                    res_amount += mparse;
-                    continue;
-                }
-                _ => {}
-            }
-            res_items.push(s.to_string());
-        }
-        Ok(Trans(ParsedTransaction {
-            line: linenum,
-            date: res_date,
-            amount: res_amount,
-            items: res_items,
-        }))
-    }
+        Transaction{amount,items,tithe:is_tithe}
+    })
 }

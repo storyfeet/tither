@@ -1,18 +1,16 @@
-#[macro_use]
 extern crate failure_derive;
+use gobble::*;
 
 //use lazy_conf::config;
 
-mod error;
-use error::LineError;
+//use error::LineError;
 //mod transaction;
 
 mod money;
 use crate::money::Money;
 
 mod action;
-use self::Action::*;
-use crate::action::Action;
+use crate::action::{Action, LineAction};
 
 use std::collections::HashMap;
 
@@ -48,15 +46,15 @@ fn get_tracker<'a>(mp: &'a mut HashMap<String, Tracker>, curr: &str) -> &'a mut 
     mp.get_mut(curr).unwrap()
 }
 
-fn count_tithe(aa: &[Action]) {
+fn count_tithe(aa: &[LineAction]) {
     let mut trackers = HashMap::new();
 
     let mut curr = "GBP".to_string();
 
     let mut tithe_pc = 10;
     for a in aa {
-        match a {
-            &Trans(ref t) => {
+        match &a.a {
+            &Action::Trans(ref t) => {
                 let c_tracker = get_tracker(&mut trackers, &curr);
                 if t.is_tithe() {
                     c_tracker.t_paid += t.amount;
@@ -69,10 +67,10 @@ fn count_tithe(aa: &[Action]) {
                     c_tracker.t_req += (t.amount * tithe_pc) / 100;
                 }
             }
-            &SetTithe(n) => {
-                tithe_pc = n;
+            &Action::SetTithe(n) => {
+                tithe_pc = n as isize;
             }
-            &SetCurr(ref c) => {
+            &Action::SetCurr(ref c) => {
                 curr = c.to_string();
             }
             _ => {}
@@ -114,23 +112,21 @@ fn main() -> Result<(), failure::Error> {
 
     let fd = std::fs::read_to_string(fname)?;
 
-    let mut v = Vec::new();
-    for (linenum, s) in fd.lines().into_iter().enumerate() {
-        let a = Action::from_line(linenum, s).map_err(|e|LineError{line:linenum,mode:e}) ?;
-        v.push(a);
-        //print!("{:?}\n",a);
-    }
+    let mut line_acs = action::PFile.parse_s(&fd)?;
 
     if let Some(t) = tags {
         let tt: Vec<String> = t.map(|v| v.to_string()).collect();
         print!("Tags = {:?}\n", tt);
-        v = v
+        line_acs = line_acs
             .into_iter()
-            .filter(|t| t.has_a_tag_or(tt.iter()))
+            .filter(|la| match &la.a {
+                Action::Trans(t) => t.has_a_tag(tt.iter()),
+                _ => true,
+            })
             .collect();
     }
 
-    count_tithe(&v);
+    count_tithe(&line_acs);
     Ok(())
 }
 
@@ -138,11 +134,4 @@ fn main() -> Result<(), failure::Error> {
 mod tests {
     use super::action::Action::*;
     use super::*;
-
-    #[test]
-    fn test_from_str() {
-        assert_eq!(Action::from_str("#hello"), NoAction);
-        //assert_eq!(Action::fro
-    }
-
 }
