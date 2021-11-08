@@ -7,9 +7,9 @@ edition = "2018"
 [dependencies]
 
 lazyf = "0.1.2"
-lazy_conf = { path="../../mlibs/lazy_conf"}
+#lazy_conf = { path="../../mlibs/lazy_conf"}
 chrono = "0.4"
 failure = "0.1.5"
 failure_derive = "0.1.5"
 clap_conf = { path="../../mlibs/clap_conf"}
-gobble = {path = "../../mlibs/gobble"}
+bogobble = {path = "../../mlibs/bogobble"}

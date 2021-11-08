@@ -1,5 +1,5 @@
 use crate::money::{Money, PMoney};
-use gobble::*;
+use bogobble::*;
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct DMoY {
@@ -10,7 +10,7 @@ pub struct DMoY {
 
 parser! {
     (PDate->DMoY),
-    (CommonUInt,last('/',CommonUInt),maybe(last('/',CommonInt)))
+    (common::UInt,last('/',common::UInt),maybe(last('/',common::Int)))
         .map(|(d,m,y)|DMoY{d,m,y})
 }
 
@@ -47,13 +47,13 @@ pub enum Action {
     SetDate(DMoY),
 }
 
-pub fn setter(s: &'static str) -> impl Parser<Out = &'static str> {
+pub fn setter(s: &'static str) -> impl OParser<&'static str> {
     or!(middle("=", s, ":,".one()), first(s, "="))
 }
 
 parser! {
     (PFile->Vec<LineAction>),
-    first(rep((NextAction,PAction)),(NextAction,eoi))
+    first(star((NextAction,PAction)),(NextAction,eoi))
         .map(|v|v.into_iter().map(|(l,a)|LineAction{l,a}).collect())
 
 }
@@ -61,9 +61,9 @@ parser! {
 parser! {
     (PAction->Action),
     or!(
-        (setter("tithe"),CommonInt,maybe("%")).map(|(_,n,_)|Action::SetTithe(n)),
-        (setter("year"),CommonUInt).map(|(_,n)|Action::SetYear(n)),
-        (setter("curr"),Alpha.star()).map(|(_,s)|Action::SetCurr(s)),
+        (setter("tithe"),common::Int,maybe("%")).map(|(_,n,_)|Action::SetTithe(n)),
+        (setter("year"),common::UInt).map(|(_,n)|Action::SetYear(n)),
+        (setter("curr"),Alpha.star()).map(|(_,s)|Action::SetCurr(s.to_string())),
         PDate.map(|d| Action::SetDate(d)),
         PTransaction.map(|t|Action::Trans(t))
     )
@@ -85,17 +85,18 @@ pub enum TransactionItem {
 
 parser! {
     (NextAction->usize)
-    skip_2_star("\t ,\n\r".skip_plus(),last("#!".one(),Any.except(",\n").skip_star())).ig_then(line_col).map(|(l,_)|l)
+        (star(or_ig!(("\t ,\n\r".iplus()),("#!".one(),Any.except(",\n").istar()))),line_col).map(|(_,(l,_))|l)
 }
 
 parser! {
     (NextItem->usize)
-    skip_2_star("\t ,".skip_plus(),last('#',Any.except(",\n").skip_star())).ig_then(line_col).map(|(l,_)|l)
+        (star(or_ig!(("\t ,".iplus()),("#",Any.except(",\n").istar()))),line_col).map(|(_,(l,_))|l)
+    //skip_2_star("\t ,".iplus(),last('#',Any.except(",\n").istar())).ig_then(line_col).map(|(l,_)|l)
 }
 
 parser! {
     (IString->String),
-    string((Alpha.plus(),sep((Alpha,NumDigit,"-_").plus(),WS.plus())))
+    string((Alpha.plus(),sep_star((Alpha,NumDigit,"-_").plus(),WS.plus())))
 }
 
 parser! {
@@ -103,14 +104,14 @@ parser! {
     or!(
         PMoney.map(|m|TransactionItem::Amount(m)),
         ("tithe",Any.except(",\n").star()).map(|_|TransactionItem::Tithe),
-        or(CommonStr,IString).map(|s|TransactionItem::Item(s))
+        or(common::Quoted,IString).map(|s|TransactionItem::Item(s))
     )
 
 }
 
 parser! {
     (PTransaction -> Transaction),
-    repeat_until_ig(first(PTranItem,NextItem),'\n').map(|v| {
+    star_until_ig(first(PTranItem,NextItem),'\n').map(|v| {
         let mut amount = Money::from(0);
         let mut items = Vec::new();
         let mut is_tithe = false;

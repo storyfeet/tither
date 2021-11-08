@@ -13,11 +13,11 @@ impl From<isize> for Money {
     }
 }
 
-use gobble::*;
+use bogobble::*;
 
 parser! {
     (PMoney->Money),
-    (maybe("$£".one()),CommonInt,maybe(('.',NumDigit.star()))).map(|(_,n,op)| match op{
+    (maybe("$£".one()),common::Int,maybe(('.',NumDigit.star()))).map(|(_,n,op)| match op{
         None=>Money(n*100),
         Some((_,ds))=> {
             let mut res = n * 100;

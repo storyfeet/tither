@@ -1,5 +1,5 @@
 extern crate failure_derive;
-use gobble::*;
+use bogobble::*;
 
 //use lazy_conf::config;
 
@@ -112,7 +112,7 @@ fn main() -> Result<(), failure::Error> {
 
     let fd = std::fs::read_to_string(fname)?;
 
-    let mut line_acs = action::PFile.parse_s(&fd)?;
+    let mut line_acs = action::PFile.parse_s(&fd).map_err(|e| e.strung())?;
 
     if let Some(t) = tags {
         let tt: Vec<String> = t.map(|v| v.to_string()).collect();
